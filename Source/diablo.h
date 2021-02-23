@@ -25,6 +25,7 @@ extern int MouseY;
 extern BOOL gbRunGame;
 extern BOOL gbRunGameResult;
 extern BOOL zoomflag;
+extern bool drawitems;
 extern BOOL gbProcessPlayers;
 extern BOOL gbLoadGame;
 extern BOOLEAN cineflag;

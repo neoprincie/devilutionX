@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sstream>
 
 DEVILUTION_BEGIN_NAMESPACE
 
@@ -1359,6 +1360,130 @@ static void DrawGame(int x, int y)
 	}
 }
 
+void DrawMonsterHealthBar(int monsterID)
+{
+	static const int yPos = 10;
+	static const int height = 25;
+	static const int width = 250;
+	static const int xCenter = (SCREEN_WIDTH) / 2 + 1; // centered between orbs
+	static const int xPos = xCenter - width / 2;
+	static const int xOffset = 0;
+	static const int yOffset = 0; // was 1
+	static const int borderWidth = 2;
+	static const int borderColors[] = { 242 /*undead*/, 232 /*demon*/, 182 /*beast*/ };
+	static const int filledColor = 142; // optimum balance in bright red between dark and light
+	static const bool fillCorners = TRUE;
+	static const int square = 10;
+	static const char *immuText = "IMMU: ";
+	static const char *resText = "RES: ";
+	static const char *vulnText = ":VULN";
+	static const int resSize = 3;
+	static const int resistColors[] = { 148, 140, 129 };
+	static const unsigned short immunes[] = { 0x8, 0x10, 0x20 };
+	static const unsigned short resists[] = { 0x1, 0x2, 0x4 };
+	static const bool cheat = FALSE;
+
+	if (!monster[monsterID].MData) {
+		return;
+	}
+
+	MonsterStruct *mon = &monster[monsterID];
+	BOOL specialMonster = !!mon->_uniqtype;
+	int currentLife = mon->_mhitpoints;
+	int maxLife = mon->_mmaxhp;
+	if (currentLife > maxLife) {
+		maxLife = currentLife;
+	}
+	int borderColor = borderColors[mon->MData->mMonstClass];
+	float FilledPercent = (float)currentLife / (float)maxLife;
+	unsigned short mres = mon->mMagicRes;
+	bool showHPNumbers = cheat || monstkills[mon->MType->mtype] >= 30;
+	bool showDamageModifiers = cheat || monstkills[mon->MType->mtype] >= 15;
+
+	if (showDamageModifiers) {
+		int resOffset = 0 + CalculateTextWidth(resText);
+		for (int k = 0; k < resSize; ++k) {
+			if (!(mres & resists[k])) {
+				continue;
+			}
+			DrawSolidRectangle(xPos + resOffset, square, yPos + height + yOffset + borderWidth + 2, square, resistColors[k]);
+			resOffset += 12;
+		}
+
+		int vulOffset = width - square - CalculateTextWidth(vulnText) - 4;
+		for (int k = 0; k < resSize; ++k) {
+			if (mres & resists[k] || mres & immunes[k]) {
+				continue;
+			}
+			DrawSolidRectangle(xPos + vulOffset, square, yPos + height + yOffset + borderWidth + 2, square, resistColors[k]);
+			vulOffset -= 12;
+		}
+	}
+
+	DrawTransparentRectangle(xPos, (int)ceil(FilledPercent * width), yPos, height, filledColor);
+
+	static const int cornerMod = fillCorners ? borderWidth : 0;
+	static const int x0 = xPos - xOffset;
+	static const int x1 = xPos + xOffset + width;
+	static const int dx = width + 2 * xOffset + cornerMod;
+	static const int y0 = yPos - yOffset;
+	static const int y1 = yPos + yOffset + height;
+	static const int dy = height + 2 * yOffset + cornerMod;
+	DrawSolidRectangle(x0 - cornerMod, dx, y0 - borderWidth, borderWidth, borderColor);
+	DrawSolidRectangle(x0, dx, y1, borderWidth, borderColor);
+	DrawSolidRectangle(x0 - borderWidth, borderWidth, y0, dy, borderColor);
+	DrawSolidRectangle(x1, borderWidth, y0 - cornerMod, dy, borderColor);
+
+	bool drawImmu = FALSE;
+	if (showDamageModifiers) {
+		int immuOffset = 0 + CalculateTextWidth(immuText) - 5;
+		for (int k = 0; k < resSize; ++k) {
+			if (!(mres & immunes[k])) {
+				continue;
+			}
+			drawImmu = TRUE;
+			DrawSolidRectangle(xPos + immuOffset, square, yPos + height + yOffset + borderWidth + 2 - square - 5, square, resistColors[k]);
+			immuOffset += 12;
+		}
+	}
+
+	std::stringstream name;
+	name << mon->mName;
+	if (mon->leader > 0) {
+		name << " (minion)";
+	}
+	int namecolor = COL_WHITE;
+	if (specialMonster) {
+		namecolor = COL_GOLD;
+	}
+
+	if (!showHPNumbers) {
+		PrintGameStr(xCenter - CalculateTextWidth((char *)name.str().c_str()) / 2, yPos + 17, (char *)name.str().c_str(), namecolor);
+	} else {
+		PrintGameStr(xCenter - CalculateTextWidth((char *)name.str().c_str()) / 2, yPos + 10, (char *)name.str().c_str(), namecolor);
+		std::stringstream life;
+		life << (currentLife >> 6);
+		life << "/";
+		life << (maxLife >> 6);
+		PrintGameStr(xCenter - CalculateTextWidth((char *)life.str().c_str()) / 2, yPos + height - 2, (char *)life.str().c_str(), COL_WHITE);
+	}
+	static const int ytxt = yPos + height + borderWidth + 12;
+	if (showDamageModifiers) {
+		PrintGameStr(xCenter - width / 2 + 2, ytxt, resText, COL_GOLD);
+	}
+
+	std::stringstream kills;
+	kills << "Kills: " << monstkills[mon->MType->mtype];
+	PrintGameStr(xCenter - CalculateTextWidth("kills") / 2 - 30, ytxt, (char *)(kills.str().c_str()), COL_WHITE);
+
+	if (drawImmu) {
+		PrintGameStr(xCenter - width / 2 + 2, yPos + height - 1, immuText, COL_GOLD);
+	}
+	if (showDamageModifiers) {
+		PrintGameStr(xCenter + width / 2 - CalculateTextWidth(vulnText), ytxt, vulnText, COL_RED);
+	}
+}
+
 // DevilutionX extension.
 extern void DrawControllerModifierHints();
 
@@ -1418,6 +1543,10 @@ void DrawView(int StartX, int StartY)
 		RedBack();
 	} else if (PauseMode != 0) {
 		gmenu_draw_pause();
+	}
+
+	if (pcursmonst != -1 && currlevel != 0) {
+		DrawMonsterHealthBar(pcursmonst);
 	}
 
 	DrawControllerModifierHints();

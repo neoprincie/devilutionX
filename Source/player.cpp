@@ -907,6 +907,7 @@ void NextPlrLevel(int pnum)
 
 	if (pnum == myplr) {
 		drawmanaflag = TRUE;
+		PlaySFX(IS_QUESTDN);
 	}
 
 	if (sgbControllerActive)
